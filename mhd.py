@@ -157,7 +157,7 @@ p_.name = "p"
 p_n = Function(Q2)
 
 # Define constant parameters
-B = Constant(mesh, (PETSc.ScalarType(0), PETSc.ScalarType(1), PETSc.ScalarType(0)))
+B = Constant(mesh, (PETSc.ScalarType(0), PETSc.ScalarType(-1), PETSc.ScalarType(0)))
 Ha = Constant(mesh, (PETSc.ScalarType(10)))
 N = Ha**2
 mu = Constant(mesh, PETSc.ScalarType(1))  # Dynamic viscosity
