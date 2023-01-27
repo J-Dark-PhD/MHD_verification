@@ -71,6 +71,7 @@ def inlet_velocity(x):
     return values
 
 
+# define tensors for chorins projection
 def epsilon(u):
     """Strain-rate tensor"""
     return sym(nabla_grad(u))
@@ -88,8 +89,8 @@ mesh = create_box(
 
 # define temporal parameters
 t = 0
-T = 10
-dt = 1 / 100  # Time step size
+T = 5
+dt = 1 / 200  # Time step size
 num_steps = int(T / dt)
 k = Constant(mesh, PETSc.ScalarType(dt))
 
@@ -180,7 +181,8 @@ solver1 = PETSc.KSP().create(mesh.comm)
 solver1.setOperators(A1)
 solver1.setType(PETSc.KSP.Type.BCGS)
 pc1 = solver1.getPC()
-pc1.setType(PETSc.PC.Type.JACOBI)
+pc1.setType(PETSc.PC.Type.HYPRE)
+pc1.setHYPREType("boomeramg")
 
 # Step 2: Evaluate the electric current density
 F2 = inner(J, v2) * dx - N * (
@@ -194,9 +196,10 @@ b2 = create_vector(L2)
 
 solver2 = PETSc.KSP().create(mesh.comm)
 solver2.setOperators(A2)
-solver2.setType(PETSc.KSP.Type.CG)
+solver2.setType(PETSc.KSP.Type.BCGS)
 pc2 = solver2.getPC()
-pc2.setType(PETSc.PC.Type.SOR)
+pc2.setType(PETSc.PC.Type.HYPRE)
+pc2.setHYPREType("boomeramg")
 
 # Step 3: Evaluate the Lorentz force
 F3 = inner(F_lorentz, v3) * dx - inner(cross(J_, B), v3) * dx
@@ -208,10 +211,10 @@ b3 = create_vector(L3)
 
 solver3 = PETSc.KSP().create(mesh.comm)
 solver3.setOperators(A3)
-solver3.setType(PETSc.KSP.Type.CG)
+solver3.setType(PETSc.KSP.Type.BCGS)
 pc3 = solver3.getPC()
-pc3.setType(PETSc.PC.Type.SOR)
-
+pc3.setType(PETSc.PC.Type.HYPRE)
+pc3.setHYPREType("boomeramg")
 
 # Step 4: Tentative velocity step
 F4 = rho * dot((u - u_n) / k, v) * dx
@@ -260,7 +263,7 @@ pc6 = solver6.getPC()
 pc6.setType(PETSc.PC.Type.SOR)
 
 # Define results files and location
-results_folder = "MHD_testing/"
+results_folder = "Results/"
 u_xdmf = XDMFFile(mesh.comm, results_folder + "u.xdmf", "w")
 u_xdmf.write_mesh(mesh)
 p_xdmf = XDMFFile(mesh.comm, results_folder + "p.xdmf", "w")
