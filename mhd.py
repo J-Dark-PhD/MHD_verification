@@ -19,7 +19,7 @@ from dolfinx.fem.petsc import (
     set_bc,
     create_matrix,
 )
-from dolfinx.io import XDMFFile, VTXWriter
+from dolfinx.io import XDMFFile
 from dolfinx.mesh import (
     create_box,
 )
@@ -89,8 +89,8 @@ mesh = create_box(
 
 # define temporal parameters
 t = 0
-T = 5
-dt = 1 / 200  # Time step size
+T = 3
+dt = 1 / 800  # Time step size
 num_steps = int(T / dt)
 k = Constant(mesh, PETSc.ScalarType(dt))
 
@@ -196,10 +196,9 @@ b2 = create_vector(L2)
 
 solver2 = PETSc.KSP().create(mesh.comm)
 solver2.setOperators(A2)
-solver2.setType(PETSc.KSP.Type.BCGS)
+solver2.setType(PETSc.KSP.Type.CG)
 pc2 = solver2.getPC()
-pc2.setType(PETSc.PC.Type.HYPRE)
-pc2.setHYPREType("boomeramg")
+pc2.setType(PETSc.PC.Type.SOR)
 
 # Step 3: Evaluate the Lorentz force
 F3 = inner(F_lorentz, v3) * dx - inner(cross(J_, B), v3) * dx
@@ -211,10 +210,9 @@ b3 = create_vector(L3)
 
 solver3 = PETSc.KSP().create(mesh.comm)
 solver3.setOperators(A3)
-solver3.setType(PETSc.KSP.Type.BCGS)
+solver3.setType(PETSc.KSP.Type.CG)
 pc3 = solver3.getPC()
-pc3.setType(PETSc.PC.Type.HYPRE)
-pc3.setHYPREType("boomeramg")
+pc3.setType(PETSc.PC.Type.SOR)
 
 # Step 4: Tentative velocity step
 F4 = rho * dot((u - u_n) / k, v) * dx
