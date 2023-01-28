@@ -17,9 +17,8 @@ from dolfinx.fem.petsc import (
     apply_lifting,
     create_vector,
     set_bc,
-    create_matrix,
 )
-from dolfinx.io import XDMFFile, VTXWriter
+from dolfinx.io import XDMFFile
 from dolfinx.mesh import (
     create_box,
 )
@@ -89,8 +88,8 @@ mesh = create_box(
 
 # define temporal parameters
 t = 0
-T = 5
-dt = 1 / 200  # Time step size
+T = 1
+dt = 1 / 100  # Time step size
 num_steps = int(T / dt)
 k = Constant(mesh, PETSc.ScalarType(dt))
 
@@ -140,7 +139,6 @@ phi_ = Function(Q)
 phi_test = Function(Q)
 phi_.name = "phi"
 phi_n = Function(Q)
-phi_n2 = Function(Q)
 
 J = TrialFunction(V2)
 v2 = TestFunction(V2)
@@ -170,11 +168,12 @@ rho = Constant(mesh, PETSc.ScalarType(1))  # Density
 # Step 1: Evaluate the electrical potential
 F1 = (
     inner(grad(phi), grad(q)) * dx
-    - inner(dot(B, curl(u_phi)) + dot(u_phi, curl(B)), q) * dx
+    - inner(dot(B, curl(u_n)) + dot(u_n, curl(B)), q) * dx
 )
 a1 = form(lhs(F1))
 L1 = form(rhs(F1))
-A1 = create_matrix(a1)
+A1 = assemble_matrix(a1, bcs=bcphi)
+A1.assemble()
 b1 = create_vector(L1)
 
 solver1 = PETSc.KSP().create(mesh.comm)
@@ -186,7 +185,7 @@ pc1.setHYPREType("boomeramg")
 
 # Step 2: Evaluate the electric current density
 F2 = inner(J, v2) * dx - N * (
-    inner(grad(phi_), v2) * dx + inner(cross(u_phi, B), v2) * dx
+    inner(grad(phi_), v2) * dx + inner(cross(u_n, B), v2) * dx
 )
 a2 = form(lhs(F2))
 L2 = form(rhs(F2))
@@ -196,10 +195,9 @@ b2 = create_vector(L2)
 
 solver2 = PETSc.KSP().create(mesh.comm)
 solver2.setOperators(A2)
-solver2.setType(PETSc.KSP.Type.BCGS)
+solver2.setType(PETSc.KSP.Type.CG)
 pc2 = solver2.getPC()
-pc2.setType(PETSc.PC.Type.HYPRE)
-pc2.setHYPREType("boomeramg")
+pc2.setType(PETSc.PC.Type.SOR)
 
 # Step 3: Evaluate the Lorentz force
 F3 = inner(F_lorentz, v3) * dx - inner(cross(J_, B), v3) * dx
@@ -211,10 +209,9 @@ b3 = create_vector(L3)
 
 solver3 = PETSc.KSP().create(mesh.comm)
 solver3.setOperators(A3)
-solver3.setType(PETSc.KSP.Type.BCGS)
+solver3.setType(PETSc.KSP.Type.CG)
 pc3 = solver3.getPC()
-pc3.setType(PETSc.PC.Type.HYPRE)
-pc3.setHYPREType("boomeramg")
+pc3.setType(PETSc.PC.Type.SOR)
 
 # Step 4: Tentative velocity step
 F4 = rho * dot((u - u_n) / k, v) * dx
@@ -273,6 +270,8 @@ phi_xdmf.write_mesh(mesh)
 J_xdmf = XDMFFile(mesh.comm, results_folder + "J.xdmf", "w")
 J_xdmf.write_mesh(mesh)
 
+u_n.x.array[:] = 10
+
 progress = tqdm.autonotebook.tqdm(desc="Solving Navier-Stokes", total=num_steps)
 for i in range(num_steps):
     progress.update(1)
@@ -280,39 +279,34 @@ for i in range(num_steps):
     t += dt
 
     # Step 1: Evaluate the electrical potential
-    assemble_matrix(A1, a1, bcs=bcphi)
-    A1.assemble()
-    with b1.localForm() as loc:
-        loc.set(0)
+    with b1.localForm() as loc_1:
+        loc_1.set(0)
     assemble_vector(b1, L1)
     apply_lifting(b1, [a1], [bcphi])
     b1.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     set_bc(b1, bcphi)
-    solver1.solve(b1, phi_n.vector)
-    phi_n.x.scatter_forward()
-
-    phi_.vector.axpy(1, phi_n.vector)
+    solver1.solve(b1, phi_.vector)
     phi_.x.scatter_forward()
 
     # Step 2: Evaluate the electric current density
-    with b2.localForm() as loc:
-        loc.set(0)
+    with b2.localForm() as loc_2:
+        loc_2.set(0)
     assemble_vector(b2, L2)
     b2.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     solver2.solve(b2, J_.vector)
     J_.x.scatter_forward()
 
     # Step 3: Evaluate the Lorentz force
-    with b3.localForm() as loc:
-        loc.set(0)
+    with b3.localForm() as loc_3:
+        loc_3.set(0)
     assemble_vector(b3, L3)
     b3.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     solver3.solve(b3, F_lorentz_.vector)
     F_lorentz_.x.scatter_forward()
 
     # Step 4: Tentative velocity step
-    with b4.localForm() as loc_1:
-        loc_1.set(0)
+    with b4.localForm() as loc_4:
+        loc_4.set(0)
     assemble_vector(b4, L4)
     apply_lifting(b4, [a4], [bcu])
     b4.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
@@ -321,8 +315,8 @@ for i in range(num_steps):
     u_.x.scatter_forward()
 
     # Step 5: Pressure corrrection step
-    with b5.localForm() as loc_2:
-        loc_2.set(0)
+    with b5.localForm() as loc_5:
+        loc_5.set(0)
     assemble_vector(b5, L5)
     apply_lifting(b5, [a5], [bcp])
     b5.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
@@ -331,8 +325,8 @@ for i in range(num_steps):
     p_.x.scatter_forward()
 
     # Step 6: Velocity correction step
-    with b6.localForm() as loc_3:
-        loc_3.set(0)
+    with b6.localForm() as loc_6:
+        loc_6.set(0)
     assemble_vector(b6, L6)
     b6.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     solver6.solve(b6, u_.vector)
@@ -340,7 +334,6 @@ for i in range(num_steps):
 
     # Update variable with solution form this time step
     u_n.x.array[:] = u_.x.array[:]
-    u_phi.x.array[:] = u_.x.array[:]
     p_n.x.array[:] = p_.x.array[:]
 
     # Write solutions to file
