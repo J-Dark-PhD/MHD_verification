@@ -88,8 +88,8 @@ mesh = create_box(
 
 # define temporal parameters
 t = 0
-T = 1
-dt = 1 / 100  # Time step size
+T = 3
+dt = 1 / 800  # Time step size
 num_steps = int(T / dt)
 k = Constant(mesh, PETSc.ScalarType(dt))
 
