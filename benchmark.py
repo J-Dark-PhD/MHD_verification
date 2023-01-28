@@ -5,17 +5,17 @@ test_values = [0, 10, 30, 60, 100]
 for Ha_value in test_values:
 
     if Ha_value == 0:
-        total_time = 1
-        dt = 1 / 100
-    elif Ha_value == 10:
-        total_time = 1
-        dt = 1 / 400
-    elif Ha_value == 30:
         total_time = 0.5
-        dt = 1 / 800
-    elif Ha_value == 60:
+        dt = 1 / 200
+    elif Ha_value == 10:
         total_time = 0.1
+        dt = 1 / 1000
+    elif Ha_value == 30:
+        total_time = 0.05
         dt = 1 / 2000
+    elif Ha_value == 60:
+        total_time = 0.02
+        dt = 1 / 5000
     elif Ha_value == 100:
         total_time = 0.01
         dt = 1 / 10000
