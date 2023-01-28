@@ -41,7 +41,9 @@ from ufl import (
 )
 
 
-def mhd_sim(Ha_no=10, conductive=True, results_foldername="Results/"):
+def mhd_sim(
+    Ha_no=10, conductive=True, results_foldername="Results/", total_time=1, dt=1 / 100
+):
     """
     runs a 3D navier stokes simulation with a lorentz force term modelling
     mhd effects on the fluid
@@ -89,8 +91,8 @@ def mhd_sim(Ha_no=10, conductive=True, results_foldername="Results/"):
 
     # define temporal parameters
     t = 0
-    T = 0.01
-    dt = 1 / 10000  # Time step size
+    T = total_time
+    dt = dt  # Time step size
     num_steps = int(T / dt)
     k = Constant(mesh, PETSc.ScalarType(dt))
 
@@ -352,19 +354,4 @@ def mhd_sim(Ha_no=10, conductive=True, results_foldername="Results/"):
     J_xdmf.close()
 
 
-mhd_sim(Ha_no=10, conductive=True)
-
-# test_values = [30, 60, 100]
-# for Ha_value in test_values:
-
-#     print("Running case Hartmann_no = {}, conductive".format(Ha_value))
-#     conductive_results_folder = "Results/fully_conductive/Ha={}/".format(Ha_value)
-#     mhd_sim(
-#         Ha_no=Ha_value, conductive=True, results_foldername=conductive_results_folder
-#     )
-
-# print("Running case Hartmann_no = {}, insulated".format(Ha_value))
-# insulated_results_folder = "Results/fully_insulated/Ha={}/".format(Ha_value)
-# mhd_sim(
-#     Ha_no=Ha_value, conductive=False, results_foldername=insulated_results_folder
-# )
+mhd_sim(Ha_no=0, conductive=True, total_time=1, dt=1 / 100)
