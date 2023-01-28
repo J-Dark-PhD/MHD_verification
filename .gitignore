@@ -1,3 +1,4 @@
 # ignore all results files
 *.xdmf
 *.h5
+*.json
