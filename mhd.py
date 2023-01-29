@@ -354,4 +354,5 @@ def mhd_sim(
     J_xdmf.close()
 
 
-mhd_sim(Ha_no=0, conductive=True, total_time=1, dt=1 / 100)
+if __name__ == "__main__":
+    mhd_sim(Ha_no=0, conductive=False, total_time=1, dt=1 / 100)
