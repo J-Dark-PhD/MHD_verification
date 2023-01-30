@@ -63,6 +63,9 @@ def mhd_sim(
     def hartmann_walls(x):
         return np.logical_or(np.isclose(x[1], 0.0), np.isclose(x[1], 2.0))
 
+    def insulated_walls(x):
+        return np.logical_or(np.isclose(x[2], 0.0), np.isclose(x[2], 2.0))
+
     def inlet(x):
         return np.isclose(x[0], 0.0)
 
@@ -117,6 +120,10 @@ def mhd_sim(
     u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
     bc_noslip = dirichletbc(u_noslip, locate_dofs_geometrical(V, walls), V)
 
+    insulating = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
+    bc_insulated = dirichletbc(insulating, locate_dofs_geometrical(V2, insulated_walls), V2)
+    bc_fully_insulated = dirichletbc(insulating, locate_dofs_geometrical(V2, walls), V2)
+
     u_inlet = Function(V)
     u_inlet.interpolate(inlet_velocity)
     bc_inflow = dirichletbc(u_inlet, locate_dofs_geometrical(V, inlet))
@@ -126,8 +133,10 @@ def mhd_sim(
 
     if conductive is True:
         bcphi = [bc_fully_conductive]
+        bcJ = [bc_insulated]
     else:
         bcphi = []
+        bcJ = [bc_fully_insulated]
 
     bcu = [bc_noslip, bc_inflow]
     bcp = [bc_outflow]
@@ -195,7 +204,7 @@ def mhd_sim(
     )
     a2 = form(lhs(F2))
     L2 = form(rhs(F2))
-    A2 = assemble_matrix(a2)
+    A2 = assemble_matrix(a2, bcs=bcJ)
     A2.assemble()
     b2 = create_vector(L2)
 
@@ -274,6 +283,8 @@ def mhd_sim(
     phi_xdmf.write_mesh(mesh)
     J_xdmf = XDMFFile(mesh.comm, results_foldername + "J.xdmf", "w")
     J_xdmf.write_mesh(mesh)
+    F_xdmf = XDMFFile(mesh.comm, results_foldername + "F.xdmf", "w")
+    F_xdmf.write_mesh(mesh)
 
     # initialise velocity field
     u_n.x.array[:] = 10
@@ -298,7 +309,9 @@ def mhd_sim(
         with b2.localForm() as loc_2:
             loc_2.set(0)
         assemble_vector(b2, L2)
+        apply_lifting(b2, [a2], [bcJ])
         b2.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
+        set_bc(b1, bcJ)
         solver2.solve(b2, J_.vector)
         J_.x.scatter_forward()
 
@@ -347,12 +360,15 @@ def mhd_sim(
         p_xdmf.write_function(p_, t)
         phi_xdmf.write_function(phi_, t)
         J_xdmf.write_function(J_, t)
+        F_xdmf.write_function(F_lorentz_, t)
 
     u_xdmf.close()
     p_xdmf.close()
     phi_xdmf.close()
     J_xdmf.close()
+    F_xdmf.close()
 
 
 if __name__ == "__main__":
-    mhd_sim(Ha_no=0, conductive=False, total_time=1, dt=1 / 100)
+    total_time = 0.01
+    mhd_sim(Ha_no=100, conductive=True, total_time=total_time, dt=total_time/200)
