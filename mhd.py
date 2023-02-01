@@ -2,7 +2,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
 import tqdm.autonotebook
-from dolfinx.mesh import create_box
+from dolfinx.mesh import create_box, locate_entities_boundary
 from dolfinx.io import XDMFFile
 from dolfinx.fem import (
     Constant,
@@ -11,6 +11,7 @@ from dolfinx.fem import (
     Function,
     FunctionSpace,
     locate_dofs_geometrical,
+    locate_dofs_topological
 )
 from dolfinx.fem.petsc import (
     apply_lifting,
@@ -42,7 +43,7 @@ from ufl import (
 
 
 def mhd_sim(
-    Ha_no=10, conductive=True, results_foldername="Results/", total_time=1, dt=1 / 100
+    Ha_no=10, conductive=True, results_foldername="Results/", total_time=1, dt=1 / 100, Nx=20, Ny=20, Nz=20
 ):
     """
     runs a 3D navier stokes simulation with a lorentz force term modelling
@@ -89,7 +90,7 @@ def mhd_sim(
 
     # define mesh
     mesh = create_box(
-        MPI.COMM_WORLD, [np.array([0, 0, 0]), np.array([20, 2, 2])], [20, 30, 30]
+        MPI.COMM_WORLD, [np.array([0, 0, 0]), np.array([20, 2, 2])], [Nx, Ny, Nz]
     )
 
     # define temporal parameters
@@ -105,12 +106,14 @@ def mhd_sim(
     electric_current_density_ele = VectorElement("CG", mesh.ufl_cell(), 1)
     lorentz_force_ele = VectorElement("CG", mesh.ufl_cell(), 1)
     pressure_ele = FiniteElement("CG", mesh.ufl_cell(), 1)
+    # magnetic_field_ele = VectorElement("CG", mesh.ufl_cell(), 1)
 
     V = FunctionSpace(mesh, velocity_ele)
     Q = FunctionSpace(mesh, electric_potential_ele)
     V2 = FunctionSpace(mesh, electric_current_density_ele)
     V3 = FunctionSpace(mesh, lorentz_force_ele)
     Q2 = FunctionSpace(mesh, pressure_ele)
+    # V4 = FunctionSpace(mesh, magnetic_field_ele)
 
     # Define boundary conditions
     bc_fully_conductive = dirichletbc(
@@ -119,28 +122,30 @@ def mhd_sim(
 
     u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
     bc_noslip = dirichletbc(u_noslip, locate_dofs_geometrical(V, walls), V)
-
-    insulating = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
-    bc_insulated = dirichletbc(insulating, locate_dofs_geometrical(V2, insulated_walls), V2)
-    bc_fully_insulated = dirichletbc(insulating, locate_dofs_geometrical(V2, walls), V2)
-
     u_inlet = Function(V)
     u_inlet.interpolate(inlet_velocity)
     bc_inflow = dirichletbc(u_inlet, locate_dofs_geometrical(V, inlet))
+
+    top_bottom_wall_facets = locate_entities_boundary(mesh, mesh.topology.dim-1, insulated_walls)
+    top_bottom_dofs = locate_dofs_topological(V2.sub(2), mesh.topology.dim-1, top_bottom_wall_facets)
+    bc_insulated_walls = dirichletbc(PETSc.ScalarType(0), top_bottom_dofs, V2.sub(2))
+    hartmann_walls_facets = locate_entities_boundary(mesh, mesh.topology.dim-1, hartmann_walls)
+    hartmann_walls_dofs = locate_dofs_topological(V2.sub(1), mesh.topology.dim-1, hartmann_walls_facets)
+    bc_hartmann_walls_insulated = dirichletbc(PETSc.ScalarType(0), hartmann_walls_dofs, V2.sub(1))
+
     bc_outflow = dirichletbc(
         PETSc.ScalarType(0), locate_dofs_geometrical(Q2, outlet), Q2
     )
 
     if conductive is True:
         bcphi = [bc_fully_conductive]
-        bcJ = [bc_insulated]
+        bcJ = [bc_insulated_walls]
     else:
-        bcphi = []
-        bcJ = [bc_fully_insulated]
+        bcJ = [bc_insulated_walls, bc_hartmann_walls_insulated]
 
     bcu = [bc_noslip, bc_inflow]
     bcp = [bc_outflow]
-
+    
     # define functions
     u = TrialFunction(V)
     v = TestFunction(V)
@@ -170,11 +175,11 @@ def mhd_sim(
     p_n = Function(Q2)
 
     # Define constant parameters
-    B = Constant(mesh, (PETSc.ScalarType(0), PETSc.ScalarType(-1), PETSc.ScalarType(0)))
     Ha = Constant(mesh, (PETSc.ScalarType(Ha_no)))
     N = Ha**2
     mu = Constant(mesh, PETSc.ScalarType(1))  # Dynamic viscosity
     rho = Constant(mesh, PETSc.ScalarType(1))  # Density
+    B = Constant(mesh, (PETSc.ScalarType(0), PETSc.ScalarType(-1), PETSc.ScalarType(0)))
 
     ######################################################################
     # Define variational formulation and solver paramaters for each step #
@@ -187,7 +192,10 @@ def mhd_sim(
     )
     a1 = form(lhs(F1))
     L1 = form(rhs(F1))
-    A1 = assemble_matrix(a1, bcs=bcphi)
+    if conductive is True:
+        A1 = assemble_matrix(a1, bcs=bcphi)
+    else:
+        A1 = assemble_matrix(a1)
     A1.assemble()
     b1 = create_vector(L1)
 
@@ -204,7 +212,8 @@ def mhd_sim(
     )
     a2 = form(lhs(F2))
     L2 = form(rhs(F2))
-    A2 = assemble_matrix(a2, bcs=bcJ)
+    # A2 = assemble_matrix(a2, bcs=bcJ)
+    A2 = assemble_matrix(a2)
     A2.assemble()
     b2 = create_vector(L2)
 
@@ -299,9 +308,12 @@ def mhd_sim(
         with b1.localForm() as loc_1:
             loc_1.set(0)
         assemble_vector(b1, L1)
-        apply_lifting(b1, [a1], [bcphi])
-        b1.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
-        set_bc(b1, bcphi)
+        if conductive is True:
+            apply_lifting(b1, [a1], [bcphi])
+            b1.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
+            set_bc(b1, bcphi)
+        else:
+            b1.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
         solver1.solve(b1, phi_.vector)
         phi_.x.scatter_forward()
 
@@ -309,9 +321,9 @@ def mhd_sim(
         with b2.localForm() as loc_2:
             loc_2.set(0)
         assemble_vector(b2, L2)
-        apply_lifting(b2, [a2], [bcJ])
+        # apply_lifting(b2, [a2], [bcJ])
         b2.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
-        set_bc(b1, bcJ)
+        # set_bc(b2, bcJ)
         solver2.solve(b2, J_.vector)
         J_.x.scatter_forward()
 
@@ -370,5 +382,5 @@ def mhd_sim(
 
 
 if __name__ == "__main__":
-    total_time = 0.01
-    mhd_sim(Ha_no=100, conductive=True, total_time=total_time, dt=total_time/200)
+
+    mhd_sim(Ha_no=100, conductive=False, total_time=1e-02, dt=1e-04, Nx=30, Ny=30, Nz=30)
