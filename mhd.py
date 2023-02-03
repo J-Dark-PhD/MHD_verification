@@ -11,7 +11,8 @@ from dolfinx.fem import (
     Function,
     FunctionSpace,
     locate_dofs_geometrical,
-    locate_dofs_topological
+    locate_dofs_topological,
+    Expression
 )
 from dolfinx.fem.petsc import (
     apply_lifting,
@@ -56,22 +57,24 @@ def mhd_sim(
             be saved
     """
     # Define boundaries
+    eps = 1e-14
+
     def walls(x):
-        walls_1 = np.logical_or(np.isclose(x[1], 0.0), np.isclose(x[1], 2.0))
-        walls_2 = np.logical_or(np.isclose(x[2], 0.0), np.isclose(x[2], 2.0))
+        walls_1 = np.logical_or(np.abs(x[1] - 0.0) < eps, np.abs(x[1] - 2.0) < eps)
+        walls_2 = np.logical_or(np.abs(x[2] - 0.0) < eps, np.abs(x[2] - 2.0) < eps)
         return np.logical_or(walls_1, walls_2)
 
     def hartmann_walls(x):
-        return np.logical_or(np.isclose(x[1], 0.0), np.isclose(x[1], 2.0))
+        return np.logical_or(np.abs(x[1] - 0.0) < eps, np.abs(x[1] - 2.0) < eps)
 
     def insulated_walls(x):
-        return np.logical_or(np.isclose(x[2], 0.0), np.isclose(x[2], 2.0))
+        return np.logical_or(np.abs(x[2] - 0.0) < eps, np.abs(x[2] - 2.0) < eps)
 
     def inlet(x):
-        return np.isclose(x[0], 0.0)
+        return np.abs(x[0] - 0.0) < eps
 
     def outlet(x):
-        return np.isclose(x[0], 20.0)
+        return np.abs(x[0] - 20.0) < eps
 
     def inlet_velocity(x):
         values = np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
@@ -106,14 +109,12 @@ def mhd_sim(
     electric_current_density_ele = VectorElement("CG", mesh.ufl_cell(), 1)
     lorentz_force_ele = VectorElement("CG", mesh.ufl_cell(), 1)
     pressure_ele = FiniteElement("CG", mesh.ufl_cell(), 1)
-    # magnetic_field_ele = VectorElement("CG", mesh.ufl_cell(), 1)
 
     V = FunctionSpace(mesh, velocity_ele)
     Q = FunctionSpace(mesh, electric_potential_ele)
     V2 = FunctionSpace(mesh, electric_current_density_ele)
     V3 = FunctionSpace(mesh, lorentz_force_ele)
     Q2 = FunctionSpace(mesh, pressure_ele)
-    # V4 = FunctionSpace(mesh, magnetic_field_ele)
 
     # Define boundary conditions
     bc_fully_conductive = dirichletbc(
@@ -180,6 +181,7 @@ def mhd_sim(
     mu = Constant(mesh, PETSc.ScalarType(1))  # Dynamic viscosity
     rho = Constant(mesh, PETSc.ScalarType(1))  # Density
     B = Constant(mesh, (PETSc.ScalarType(0), PETSc.ScalarType(-1), PETSc.ScalarType(0)))
+    # phi_ = Constant(mesh, PETSc.ScalarType(0))
 
     ######################################################################
     # Define variational formulation and solver paramaters for each step #
@@ -188,7 +190,7 @@ def mhd_sim(
     # Step 1: Evaluate the electrical potential
     F1 = (
         inner(grad(phi), grad(q)) * dx
-        - inner(dot(B, curl(u_n)) + dot(u_n, curl(B)), q) * dx
+        - inner(dot(curl(u_n), B) + dot(u_n, curl(B)), q) * dx
     )
     a1 = form(lhs(F1))
     L1 = form(rhs(F1))
@@ -196,6 +198,7 @@ def mhd_sim(
         A1 = assemble_matrix(a1, bcs=bcphi)
     else:
         A1 = assemble_matrix(a1)
+    A1 = assemble_matrix(a1)
     A1.assemble()
     b1 = create_vector(L1)
 
@@ -205,6 +208,7 @@ def mhd_sim(
     pc1 = solver1.getPC()
     pc1.setType(PETSc.PC.Type.HYPRE)
     pc1.setHYPREType("boomeramg")
+
 
     # Step 2: Evaluate the electric current density
     F2 = inner(J, v2) * dx - N * (
@@ -265,7 +269,7 @@ def mhd_sim(
 
     solver5 = PETSc.KSP().create(mesh.comm)
     solver5.setOperators(A5)
-    solver5.setType(PETSc.KSP.Type.BCGS)
+    solver5.setType(PETSc.KSP.Type.MINRES)
     pc5 = solver5.getPC()
     pc5.setType(PETSc.PC.Type.HYPRE)
     pc5.setHYPREType("boomeramg")
@@ -286,17 +290,17 @@ def mhd_sim(
     # Define results files and location
     u_xdmf = XDMFFile(mesh.comm, results_foldername + "u.xdmf", "w")
     u_xdmf.write_mesh(mesh)
-    p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
-    p_xdmf.write_mesh(mesh)
-    phi_xdmf = XDMFFile(mesh.comm, results_foldername + "phi.xdmf", "w")
-    phi_xdmf.write_mesh(mesh)
-    J_xdmf = XDMFFile(mesh.comm, results_foldername + "J.xdmf", "w")
-    J_xdmf.write_mesh(mesh)
-    F_xdmf = XDMFFile(mesh.comm, results_foldername + "F.xdmf", "w")
-    F_xdmf.write_mesh(mesh)
+    # p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
+    # p_xdmf.write_mesh(mesh)
+    # phi_xdmf = XDMFFile(mesh.comm, results_foldername + "phi.xdmf", "w")
+    # phi_xdmf.write_mesh(mesh)
+    # J_xdmf = XDMFFile(mesh.comm, results_foldername + "J.xdmf", "w")
+    # J_xdmf.write_mesh(mesh)
+    # F_xdmf = XDMFFile(mesh.comm, results_foldername + "F.xdmf", "w")
+    # F_xdmf.write_mesh(mesh)
 
     # initialise velocity field
-    u_n.x.array[:] = 10
+    # u_n.x.array[:] = 10
 
     progress = tqdm.autonotebook.tqdm(desc="Solving Navier-Stokes", total=num_steps)
     for i in range(num_steps):
@@ -316,6 +320,8 @@ def mhd_sim(
             b1.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
         solver1.solve(b1, phi_.vector)
         phi_.x.scatter_forward()
+
+        # phi_.x.array[:] = 0
 
         # Step 2: Evaluate the electric current density
         with b2.localForm() as loc_2:
@@ -369,18 +375,18 @@ def mhd_sim(
 
         # Write solutions to file
         u_xdmf.write_function(u_, t)
-        p_xdmf.write_function(p_, t)
-        phi_xdmf.write_function(phi_, t)
-        J_xdmf.write_function(J_, t)
-        F_xdmf.write_function(F_lorentz_, t)
+        # p_xdmf.write_function(p_, t)
+        # phi_xdmf.write_function(phi_, t)
+        # J_xdmf.write_function(J_, t)
+        # F_xdmf.write_function(F_lorentz_, t)
 
     u_xdmf.close()
-    p_xdmf.close()
-    phi_xdmf.close()
-    J_xdmf.close()
-    F_xdmf.close()
+    # p_xdmf.close()
+    # phi_xdmf.close()
+    # J_xdmf.close()
+    # F_xdmf.close()
 
 
 if __name__ == "__main__":
 
-    mhd_sim(Ha_no=100, conductive=False, total_time=1e-02, dt=1e-04, Nx=30, Ny=30, Nz=30)
+    mhd_sim(Ha_no=60, conductive=False, total_time=2e-01, dt=2e-04, Nx=20, Ny=30, Nz=30)
