@@ -146,7 +146,7 @@ def mhd_sim(
     bcu = [bc_noslip, bc_inflow]
     bcp = [bc_outflow]
 
-    # define functions
+    # define functions and test functions
     u = TrialFunction(V)
     v = TestFunction(V)
     u_ = Function(V)
@@ -261,12 +261,10 @@ def mhd_sim(
     solver4.setConvergenceHistory()
 
     # Define results files and location
-    potential_values = [1, 2]
-    if export_mode not in potential_values:
+    if export_mode not in [1, 2]:
         raise ValueError("unexpected export_mode value")
 
-    if export_mode in [1, 3]:
-        print("in mode 1")
+    if export_mode == 1:
         u_xdmf = XDMFFile(mesh.comm, results_foldername + "u.xdmf", "w")
         u_xdmf.write_mesh(mesh)
         p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
@@ -342,7 +340,6 @@ def mhd_sim(
 
         # Write solutions to file
         if export_mode == 1:
-            print("in mode 1")
             u_xdmf.write_function(u_, t)
             p_xdmf.write_function(p_, t)
             phi_xdmf.write_function(phi_, t)
@@ -359,13 +356,13 @@ def mhd_sim(
 if __name__ == "__main__":
 
     mhd_sim(
-        Ha_no=100,
+        Ha_no=30,
         conductive=True,
-        results_foldername="Results/testing/",
-        total_time=1e-02,
-        dt=1e-04,
+        results_foldername="Results/",
+        total_time=1e-01,
+        dt=1e-03,
         Nx=20,
         Ny=30,
         Nz=30,
-        export_mode=2
+        export_mode=1
     )
