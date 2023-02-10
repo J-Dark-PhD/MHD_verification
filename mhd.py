@@ -61,6 +61,14 @@ def mhd_sim(
         conductive (bool): The conductivity of the Hartmann walls
         results_foldername (str): The location in which results files will
             be saved
+        total_time(int, float): total time of simulation
+        dt (int, float): time step for the solver
+        Nx (int, float): number of cells in mesh x plane
+        Ny (int, float): number of cells in mesh y plane
+        Nz (int, float): number of cells in mesh z plane
+        export_mode (int, float): mode in which to export results, if 1 results
+            from each time step will be exported, if 2 only final timestep
+            is exported.
     """
     # Define boundaries
     eps = 1e-14
@@ -234,6 +242,7 @@ def mhd_sim(
     pc3 = solver3.getPC()
     pc3.setType(PETSc.PC.Type.HYPRE)
     pc3.setHYPREType("boomeramg")
+    solver3.setConvergenceHistory()
 
     # Step 4: Velocity correction step
     a4 = form(rho * dot(u, v) * dx)
@@ -249,25 +258,32 @@ def mhd_sim(
     solver4.setTolerances(atol=1e-08)
     pc4 = solver4.getPC()
     pc4.setType(PETSc.PC.Type.SOR)
+    solver4.setConvergenceHistory()
 
     # Define results files and location
-    u_xdmf = XDMFFile(mesh.comm, results_foldername + "u.xdmf", "w")
-    u_xdmf.write_mesh(mesh)
-    p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
-    p_xdmf.write_mesh(mesh)
-    phi_xdmf = XDMFFile(mesh.comm, results_foldername + "phi.xdmf", "w")
-    phi_xdmf.write_mesh(mesh)
+    potential_values = [1, 2]
+    if export_mode not in potential_values:
+        raise ValueError("unexpected export_mode value")
 
+    if export_mode in [1, 3]:
+        print("in mode 1")
+        u_xdmf = XDMFFile(mesh.comm, results_foldername + "u.xdmf", "w")
+        u_xdmf.write_mesh(mesh)
+        p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
+        p_xdmf.write_mesh(mesh)
+        phi_xdmf = XDMFFile(mesh.comm, results_foldername + "phi.xdmf", "w")
+        phi_xdmf.write_mesh(mesh)
+    
     # Initialise velocity field
     # u_n.x.array[:] = 10
 
-    # Print convergence details
+    # Print convergence details option
     # opts = PETSc.Options()
     # opts["ksp_monitor"] = None
     # solver1.setFromOptions()
+    # solver2.setFromOptions()
+    # solver3.setFromOptions()
     # solver4.setFromOptions()
-    # solver5.setFromOptions()
-    # solver6.setFromOptions()
 
     progress = tqdm.autonotebook.tqdm(desc="Solving Navier-Stokes", total=num_steps)
     for i in range(num_steps):
@@ -325,38 +341,31 @@ def mhd_sim(
         p_n.x.array[:] = p_.x.array[:]
 
         # Write solutions to file
-        if export_mode == 1 or 3:
+        if export_mode == 1:
+            print("in mode 1")
             u_xdmf.write_function(u_, t)
             p_xdmf.write_function(p_, t)
             phi_xdmf.write_function(phi_, t)
-        elif export_mode == 2:
-            pass
 
-    if export_mode == 1:
-        pass
-    elif export_mode == 2 or 3:
-        u_final_xdmf = XDMFFile(mesh.comm, results_foldername + "u_final.xdmf", "w")
-        u_final_xdmf.write_mesh(mesh)
-        p_final_xdmf = XDMFFile(mesh.comm, results_foldername + "p_final.xdmf", "w")
-        p_final_xdmf.write_mesh(mesh)
-        phi_final_xdmf = XDMFFile(mesh.comm, results_foldername + "phi_final.xdmf", "w")
-        phi_final_xdmf.write_mesh(mesh)
-
-        u_final_xdmf.write_function(u_)
-        p_final_xdmf.write_function(p_)
-        phi_final_xdmf.write_function(phi_)
-
-        u_final_xdmf.close()
-        p_final_xdmf.close()
-        phi_final_xdmf.close()
+    if export_mode == 2:
+        u_xdmf.write_function(u_)
+        p_xdmf.write_function(p_)
+        phi_xdmf.write_function(phi_)
 
     u_xdmf.close()
     p_xdmf.close()
     phi_xdmf.close()
 
-
 if __name__ == "__main__":
 
     mhd_sim(
-        Ha_no=100, conductive=False, total_time=3e-02, dt=1e-04, Nx=20, Ny=30, Nz=30
+        Ha_no=100,
+        conductive=True,
+        results_foldername="Results/testing/",
+        total_time=1e-02,
+        dt=1e-04,
+        Nx=20,
+        Ny=30,
+        Nz=30,
+        export_mode=2
     )
