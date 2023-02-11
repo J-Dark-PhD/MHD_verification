@@ -157,4 +157,7 @@ def insulated_case():
         plt.tight_layout()
 
 
+conductive_case()
+insulated_case()
+
 plt.show()
