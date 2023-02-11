@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 Ha_values = [0, 10, 30, 60]
-mesh_values = [20, 30, 40, 50]
+mesh_values = [20, 30, 40, 50, 60]
 conductive_results_folder = "../mesh_testing/conductive/"
 insulated_results_folder = "../mesh_testing/insulated/"
 data = np.genfromtxt(
