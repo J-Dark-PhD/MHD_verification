@@ -4,20 +4,22 @@ Ha_test_values = [0, 10, 30, 60, 100]
 
 for Ha_value in Ha_test_values:
 
-    mesh_density = 100
-
     if Ha_value == 0:
         total_time = 5e-01
         dt = 5e-03
+        mesh_density = 30
     elif Ha_value == 10:
         total_time = 5e-01
         dt = 5e-03
+        mesh_density = 30
     elif Ha_value == 30:
         total_time = 1e-01
         dt = 1e-03
+        mesh_density = 40
     elif Ha_value == 60:
         total_time = 2e-02
         dt = 2e-04
+        mesh_density = 100
     elif Ha_value == 100:
         total_time = 1e-02
         dt = 1e-04
@@ -41,18 +43,23 @@ for Ha_value in Ha_test_values:
     if Ha_value == 0:
         total_time = 5e-01
         dt = 5e-03
+        mesh_density = 30
     elif Ha_value == 10:
         total_time = 5e-01
         dt = 5e-03
+        mesh_density = 40
     elif Ha_value == 30:
         total_time = 1e-01
         dt = 1e-03
+        mesh_density = 100
     elif Ha_value == 60:
         total_time = 4e-02
         dt = 2e-04
+        mesh_density = 100
     elif Ha_value == 100:
         total_time = 3e-02
         dt = 1e-04
+        mesh_density = 100
 
     print("Running case Hartmann_no = {}, insulated".format(Ha_value))
     insulated_results_folder = "Results/fully_insulated/Ha={}/".format(Ha_value)
