@@ -264,14 +264,13 @@ def mhd_sim(
     if export_mode not in [1, 2]:
         raise ValueError("unexpected export_mode value")
 
-    if export_mode == 1:
-        u_xdmf = XDMFFile(mesh.comm, results_foldername + "u.xdmf", "w")
-        u_xdmf.write_mesh(mesh)
-        p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
-        p_xdmf.write_mesh(mesh)
-        phi_xdmf = XDMFFile(mesh.comm, results_foldername + "phi.xdmf", "w")
-        phi_xdmf.write_mesh(mesh)
-    
+    u_xdmf = XDMFFile(mesh.comm, results_foldername + "u.xdmf", "w")
+    u_xdmf.write_mesh(mesh)
+    p_xdmf = XDMFFile(mesh.comm, results_foldername + "p.xdmf", "w")
+    p_xdmf.write_mesh(mesh)
+    phi_xdmf = XDMFFile(mesh.comm, results_foldername + "phi.xdmf", "w")
+    phi_xdmf.write_mesh(mesh)
+
     # Initialise velocity field
     # u_n.x.array[:] = 10
 
@@ -353,6 +352,7 @@ def mhd_sim(
     p_xdmf.close()
     phi_xdmf.close()
 
+
 if __name__ == "__main__":
 
     mhd_sim(
@@ -364,5 +364,5 @@ if __name__ == "__main__":
         Nx=20,
         Ny=30,
         Nz=30,
-        export_mode=1
+        export_mode=1,
     )
