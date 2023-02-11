@@ -39,6 +39,6 @@ for Ha_value, total_time, dt, mesh_density in zip(
         total_time=total_time,
         dt=dt,
         Nx=20,
-        Ny=100,
-        Nz=100,
+        Ny=mesh_density,
+        Nz=mesh_density,
     )
