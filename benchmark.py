@@ -20,6 +20,7 @@ for Ha_value, total_time, dt, mesh_density in zip(
         Nx=20,
         Ny=mesh_density,
         Nz=mesh_density,
+        export_mode=2,
     )
 
 insulated_total_times = [5e-01, 5e-01, 1e-01, 4e-02, 3e-02]
@@ -41,4 +42,5 @@ for Ha_value, total_time, dt, mesh_density in zip(
         Nx=20,
         Ny=mesh_density,
         Nz=mesh_density,
+        export_mode=2,
     )
