@@ -100,7 +100,7 @@ def mhd_sim(
 
     def sigma(u, p):
         """Stress tensor"""
-        return 2 * mu * epsilon(u) - p * Identity(u.geometric_dimension())
+        return 2 * mu * epsilon(u) - p * Identity(len(u))
 
     # define mesh
     mesh = create_box(
@@ -282,7 +282,7 @@ def mhd_sim(
     # solver3.setFromOptions()
     # solver4.setFromOptions()
 
-    progress = tqdm.autonotebook.tqdm(desc="Solving Navier-Stokes", total=num_steps)
+    progress = tqdm.autonotebook.tqdm(desc="Solving MHD", total=num_steps)
     for i in range(num_steps):
         progress.update(1)
         # Update current time step
