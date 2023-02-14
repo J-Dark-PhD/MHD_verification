@@ -1,8 +1,8 @@
 from mhd import mhd_sim
 
+Ha_test_values = [0, 10, 30, 60, 100]
 mesh_test_values = [20, 30, 40, 50]
 
-Ha_test_values = [0, 10, 30, 60, 100]
 conductive_total_times = [5e-01, 5e-01, 1e-01, 2e-02, 1e-02]
 conductive_dts = [5e-03, 5e-03, 1e-03, 2e-04, 1e-04]
 
