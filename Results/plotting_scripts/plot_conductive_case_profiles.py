@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 results_folder = "../fully_conductive/profiles/"
-Ha_values = [0, 10, 30, 60, 100]
+Ha_values = [100, 60, 30, 10, 0]
 x_values = []
 velocities = []
 
@@ -24,17 +24,19 @@ for case in x_values:
     new_values = case - 1
     graph_x_values.append(new_values)
 
-colours = ["cyan", "black", "red", "lawngreen", "blue"]
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif', size=12)
+
+colours = ["blue", "lawngreen", "red", "black", "cyan"]
 plt.figure()
 for x, vel, Ha, colour in zip(graph_x_values, normalised_velocities, Ha_values, colours):
     plt.plot(x, vel, label="Ha = {}".format(Ha), color=colour)
 
-
-plt.xlabel("Z/L")
+plt.legend()
+plt.xlabel("y/L")
 plt.xlim(-1, 1)
 plt.ylim(0, 25)
 plt.ylabel("$u/u_{0}$")
-plt.legend()
 plt.tight_layout()
 
 plt.show()
