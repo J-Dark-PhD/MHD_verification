@@ -41,6 +41,8 @@ from ufl import (
     TestFunction,
     TrialFunction,
     VectorElement,
+    SpatialCoordinate,
+    exp,
 )
 from MeshFromXDMF import MeshXDMF
 import properties
@@ -126,26 +128,45 @@ T_n = TestFunction(V)
 
 eps = 1e-14
 
-
-def front_boundary(x):
-    return np.abs(x[0] - 0) < eps
-
-
-def rear_boundary(x):
-    return np.abs(x[0] - 0.567) < eps
-
-
-bc_front = dirichletbc(
-    PETSc.ScalarType(1), locate_dofs_geometrical(V, front_boundary), V
+front_dofs = locate_dofs_topological(
+    V, my_mesh.mesh.topology.dim - 1, ft.indices[ft.values == id_plasma_facing_surface]
 )
-bc_rear = dirichletbc(PETSc.ScalarType(0), locate_dofs_geometrical(V, rear_boundary), V)
+bc_front = dirichletbc(PETSc.ScalarType(1), front_dofs, V)
+
+rear_dofs = locate_dofs_topological(
+    V, my_mesh.mesh.topology.dim - 1, ft.indices[ft.values == id_outlet]
+)
+bc_rear = dirichletbc(PETSc.ScalarType(0), rear_dofs, V)
 
 bcs = [bc_front, bc_rear]
 
 f = Constant(my_mesh.mesh, PETSc.ScalarType(0))
 
+
+class source:
+    def __init__(self, value, volume) -> None:
+        self.volume = volume
+        self.value = exp(value)
+
+
+x = SpatialCoordinate(my_mesh.mesh)
+
+sources = [
+    source(value=2 * x[0], volume=id_lipb),
+    source(value=3 * x[0], volume=id_eurofers),
+    source(value=3 * x[0], volume=id_W),
+]
+
 F = dot(grad(T), grad(T_n)) * my_mesh.dx
 F += -f * T_n * my_mesh.dx
+
+for source_term in sources:
+    if type(source_term.volume) is list:
+        volumes = source_term.volume
+    else:
+        volumes = [source_term.volume]
+    for volume in volumes:
+        F += -source_term.value * T_n * my_mesh.dx(volume)
 
 problem = NonlinearProblem(F, T, bcs=bcs)
 
