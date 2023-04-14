@@ -101,7 +101,7 @@ class MeshXDMF(Mesh):
         return mesh_tags_cells
 
 
-class boundary_condition:
+class BoundaryCondition:
     """Base boundary condition class
 
     Args:
@@ -116,7 +116,7 @@ class boundary_condition:
         self.surfaces = surfaces
 
 
-class flux_bc(boundary_condition):
+class FluxBC(BoundaryCondition):
     """Boundary condition applying flux
 
     Args:
@@ -133,7 +133,7 @@ class flux_bc(boundary_condition):
         self.form = self.value
 
 
-class convenctive_flux_bc(flux_bc):
+class ConvenctiveFluxBC(FluxBC):
     """fluxbc subclass for convective heat flux
     -lambda * grad(T) * n = h_coeff * (T - T_ext)
 
@@ -152,7 +152,7 @@ class convenctive_flux_bc(flux_bc):
         self.form = -self.h_coeff * (T - self.T_ext)
 
 
-class source:
+class Source:
     """Volumetric source term
 
     Args:

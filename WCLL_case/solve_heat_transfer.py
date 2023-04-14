@@ -21,7 +21,7 @@ from ufl import (
     conditional,
     lt,
 )
-from my_classes import MeshXDMF, flux_bc, convenctive_flux_bc, source
+from my_classes import MeshXDMF, FluxBC, ConvenctiveFluxBC, Source
 import properties
 
 id_lipb = 6
@@ -110,11 +110,11 @@ def Heat_Transfer_Solver():
 
     bcs = [bc_inlet_temperature]
 
-    plasma_heat_flux = flux_bc(value=0.5e06, surfaces=id_plasma_facing_surface)
-    convective_flux_bz = convenctive_flux_bc(
+    plasma_heat_flux = FluxBC(value=0.5e06, surfaces=id_plasma_facing_surface)
+    convective_flux_bz = ConvenctiveFluxBC(
         h_coeff=5.025e03, T_ext=584.65, surfaces=ids_pipe_coolant_interface
     )
-    convective_flux_fw = convenctive_flux_bc(
+    convective_flux_fw = ConvenctiveFluxBC(
         h_coeff=8.876e03 * 5, T_ext=584.65, surfaces=id_fw_coolant_interface
     )
 
@@ -123,8 +123,8 @@ def Heat_Transfer_Solver():
 
     x = SpatialCoordinate(my_mesh.mesh)
     sources = [
-        source(value=23.2e06 * exp(-71.74 * x[0]), volumes=id_W),
-        source(
+        Source(value=23.2e06 * exp(-71.74 * x[0]), volumes=id_W),
+        Source(
             value=conditional(
                 lt(x[0], 0.15),
                 9.6209e06 * exp(-12.02 * x[0]),
@@ -132,7 +132,7 @@ def Heat_Transfer_Solver():
             ),
             volumes=id_eurofers,
         ),
-        source(
+        Source(
             value=conditional(
                 lt(x[0], 0.15),
                 6.3034e05 * x[0] ** (-0.789),
