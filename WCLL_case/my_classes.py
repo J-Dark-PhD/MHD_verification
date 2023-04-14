@@ -7,7 +7,6 @@ from dolfinx.fem import (
 from ufl import (
     Measure,
 )
-import sympy as sp
 
 
 class Mesh:
